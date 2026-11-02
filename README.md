@@ -64,8 +64,8 @@ Known limits: nginx itself runs as the default image user, and Redis has no pass
 - [x] M2 Hardening and scanning
 - [x] M3 Docker Compose: API, Redis, Postgres and nginx with separate networks
 - [x] M4 Break-and-fix lab (3 deliberate failures, incidents 2-4 in docs/incident-log.md)
-- [ ] M5 CI pipeline with build cache, scan and push
 - [x] M5 CI pipeline: smoke test, build cache, Trivy scan, push to GHCR
+
 ## Break-and-fix lab (M4)
 
 Each override file breaks the stack in one specific way. The diagnosis and fix for each is written up in [docs/incident-log.md](docs/incident-log.md).
