@@ -65,7 +65,7 @@ Known limits: nginx itself runs as the default image user, and Redis has no pass
 - [x] M3 Docker Compose: API, Redis, Postgres and nginx with separate networks
 - [x] M4 Break-and-fix lab (3 deliberate failures, incidents 2-4 in docs/incident-log.md)
 - [ ] M5 CI pipeline with build cache, scan and push
-
+- [x] M5 CI pipeline: smoke test, build cache, Trivy scan, push to GHCR
 ## Break-and-fix lab (M4)
 
 Each override file breaks the stack in one specific way. The diagnosis and fix for each is written up in [docs/incident-log.md](docs/incident-log.md).
@@ -80,3 +80,18 @@ Reproduce any of them, then restore with a plain `docker compose up -d`:
 
     docker compose -f compose.yaml -f compose.break-oom.yaml up -d
     docker compose up -d
+
+## CI pipeline (M5)
+
+![ci](https://github.com/fiehna-hue/docker-deep-dive/actions/workflows/ci.yml/badge.svg)
+
+Every push and pull request runs [.github/workflows/ci.yml](.github/workflows/ci.yml):
+
+1. **Smoke test:** builds and starts the full four-service stack, waits for every healthcheck, then calls /health and creates and lists an item through nginx.
+2. **Cached build:** BuildKit layer cache stored in GitHub Actions, so unchanged layers are not rebuilt.
+3. **Trivy scan:** the pipeline fails on any fixable CRITICAL vulnerability.
+4. **Publish:** only on `main`, the image is pushed to GitHub Container Registry tagged `latest` and with the commit SHA.
+
+Pull the published image:
+
+    docker pull ghcr.io/fiehna-hue/docker-deep-dive:latest
