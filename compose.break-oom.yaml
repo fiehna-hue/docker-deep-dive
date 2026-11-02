@@ -1,0 +1,3 @@
+services:
+  api:
+    mem_limit: 20m
