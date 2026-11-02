@@ -63,5 +63,20 @@ Known limits: nginx itself runs as the default image user, and Redis has no pass
 - [x] M1 Size and cache optimization
 - [x] M2 Hardening and scanning
 - [x] M3 Docker Compose: API, Redis, Postgres and nginx with separate networks
-- [ ] M4 Break-and-fix lab (first incident already in docs/incident-log.md)
+- [x] M4 Break-and-fix lab (3 deliberate failures, incidents 2-4 in docs/incident-log.md)
 - [ ] M5 CI pipeline with build cache, scan and push
+
+## Break-and-fix lab (M4)
+
+Each override file breaks the stack in one specific way. The diagnosis and fix for each is written up in [docs/incident-log.md](docs/incident-log.md).
+
+| Override file | What it breaks | Symptom | Key evidence |
+|---|---|---|---|
+| compose.break-oom.yaml | Memory limit of 20 MB on the api | exit 137, nginx never starts | `docker inspect` shows OOMKilled=true |
+| compose.break-secret.yaml | Typo in the secret file path | exit 3, worker failed to boot | Traceback names the missing file |
+| compose.break-network.yaml | api removed from the backend network | exit 1 after about 24 s of retries | DNS test: `db` resolves on backend, not on frontend |
+
+Reproduce any of them, then restore with a plain `docker compose up -d`:
+
+    docker compose -f compose.yaml -f compose.break-oom.yaml up -d
+    docker compose up -d
