@@ -47,7 +47,8 @@ def run(sql, params=None, fetch=False):
 
 
 def init_db():
-    for _ in range(20):
+    last_error = ""
+    for attempt in range(1, 21):
         try:
             conn = connect()
             try:
@@ -62,9 +63,11 @@ def init_db():
             finally:
                 conn.close()
             return
-        except psycopg2.OperationalError:
+        except psycopg2.OperationalError as exc:
+            last_error = str(exc).strip()
+            print(f"init_db: attempt {attempt}/20 failed: {last_error}", flush=True)
             time.sleep(1)
-    raise RuntimeError("database not reachable")
+    raise RuntimeError(f"database not reachable: {last_error}")
 
 
 init_db()
