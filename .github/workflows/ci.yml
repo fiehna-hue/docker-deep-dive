@@ -1,0 +1,77 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/fiehna-hue/docker-deep-dive
+
+jobs:
+  build-test-scan-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Smoke test the full Compose stack
+        run: |
+          mkdir -p secrets
+          openssl rand -hex 16 > secrets/db_password.txt
+          docker compose up -d --build --wait --wait-timeout 120
+          curl -sf localhost:8080/health
+          curl -sf -X POST localhost:8080/items \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"ci-test","quantity":1}'
+          curl -sf localhost:8080/items
+          docker compose ps
+
+      - name: Show logs if the smoke test failed
+        if: failure()
+        run: docker compose logs --tail 50
+
+      - name: Tear down the stack
+        if: always()
+        run: docker compose down -v
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image with layer cache (not pushed yet)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.IMAGE }}:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push image (main only; layers come from cache)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+          cache-from: type=gha
