@@ -37,11 +37,31 @@ Build the naive image: docker build -f Dockerfile.naive -t ddd:naive .
 Build the optimized image: docker build -t ddd:v2 .
 Scan an image: docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest image --severity HIGH,CRITICAL --quiet ddd:v2
 
+## M3: four-service stack with network isolation
+
+    host :8080 -> nginx -> api (scalable) -> redis
+                                         -> db (Postgres, named volume)
+
+    frontend network: nginx, api
+    backend network (internal, no internet access): api, redis, db
+
+Tested:
+- Only nginx publishes a port. api, redis and db are not reachable from the host.
+- nslookup db and nslookup redis from inside the nginx container fail with NXDOMAIN; only api resolves.
+- The database password is a Docker secret read from a file (never an environment variable, never committed).
+- Data survives docker compose down and up through a named volume.
+- The API runs read-only, with all capabilities dropped, no-new-privileges, and memory and process limits.
+- The API was scaled from 2 to 3 to 1 replicas while nginx kept running (see docs/incident-log.md for the nginx lesson).
+
+Run it: mkdir -p secrets, then openssl rand -hex 16 > secrets/db_password.txt, then docker compose up -d --build --scale api=2, then curl localhost:8080/health
+
+Known limits: nginx itself runs as the default image user, and Redis has no password because it is only reachable on the internal network.
+
 ## Roadmap
 
 - [x] M0 Naive baseline
 - [x] M1 Size and cache optimization
 - [x] M2 Hardening and scanning
-- [ ] M3 Docker Compose: API, Redis, Postgres and nginx with separate networks
-- [ ] M4 Break-and-fix lab with an incident log
+- [x] M3 Docker Compose: API, Redis, Postgres and nginx with separate networks
+- [ ] M4 Break-and-fix lab (first incident already in docs/incident-log.md)
 - [ ] M5 CI pipeline with build cache, scan and push
